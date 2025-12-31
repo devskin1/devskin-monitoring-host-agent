@@ -1,0 +1,31 @@
+{
+  "apiUrl": "https://api-monitoring.devskin.com",
+  "agentKey": "your-agent-key-here",
+  "tenantId": "your-tenant-id-here",
+  "resourceId": "auto-generate-on-first-run",
+  "hostname": "auto-detect",
+  "collectionInterval": 60000,
+  "batchSize": 10,
+  "retryAttempts": 3,
+  "retryDelay": 5000,
+  "logLevel": "info",
+  "collectors": {
+    "cpu": {
+      "enabled": true
+    },
+    "memory": {
+      "enabled": true
+    },
+    "disk": {
+      "enabled": true,
+      "mountPoints": ["/", "/home", "/var"]
+    },
+    "network": {
+      "enabled": true,
+      "interfaces": ["eth0", "wlan0"]
+    },
+    "process": {
+      "enabled": true
+    }
+  }
+}

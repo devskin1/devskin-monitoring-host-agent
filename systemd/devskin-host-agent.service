@@ -1,0 +1,29 @@
+[Unit]
+Description=DevSkin Host Monitoring Agent
+After=network.target
+
+[Service]
+Type=simple
+User=devskin
+Group=devskin
+WorkingDirectory=/opt/devskin-agent
+ExecStart=/usr/bin/node /opt/devskin-agent/dist/index.js --config /etc/devskin/config.json
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=devskin-agent
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/devskin
+
+# Resource limits
+LimitNOFILE=65536
+MemoryLimit=512M
+
+[Install]
+WantedBy=multi-user.target

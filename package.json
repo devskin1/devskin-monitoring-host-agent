@@ -1,0 +1,32 @@
+{
+  "name": "@devskin/host-agent",
+  "version": "1.0.0",
+  "description": "DevSkin host monitoring agent",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "watch": "tsx watch src/index.ts"
+  },
+  "keywords": [
+    "monitoring",
+    "metrics",
+    "agent",
+    "infrastructure"
+  ],
+  "author": "DevSkin",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "systeminformation": "^5.21.20",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.27",
+    "@types/systeminformation": "^3.54.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
