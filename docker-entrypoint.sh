@@ -5,11 +5,16 @@ set -e
 cat > /app/config/config.json <<EOF
 {
   "apiUrl": "${DEVSKIN_API_URL:-https://api-monitoring.devskin.com}",
-  "apiKey": "${DEVSKIN_API_KEY}",
+  "agentKey": "${DEVSKIN_API_KEY}",
+  "tenantId": "${DEVSKIN_TENANT_ID}",
   "hostname": "${DEVSKIN_HOSTNAME:-$(hostname)}",
   "environment": "${DEVSKIN_ENVIRONMENT:-production}",
   "collectionInterval": ${DEVSKIN_COLLECTION_INTERVAL:-60000},
-  "debug": ${DEVSKIN_DEBUG:-false}
+  "batchSize": ${DEVSKIN_BATCH_SIZE:-10},
+  "retryAttempts": ${DEVSKIN_RETRY_ATTEMPTS:-3},
+  "retryDelay": ${DEVSKIN_RETRY_DELAY:-5000},
+  "debug": ${DEVSKIN_DEBUG:-false},
+  "logLevel": "${DEVSKIN_LOG_LEVEL:-info}"
 }
 EOF
 

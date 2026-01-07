@@ -140,7 +140,28 @@ export class HostAgent {
       if (ipAddress) break;
     }
 
-    this.logger.info(`Registering host: ${hostname}`);
+    // Fallback to any IPv4 if no external IP found (Docker, VMs, etc)
+    if (!ipAddress) {
+      for (const iface of Object.values(networkInterfaces)) {
+        if (iface) {
+          for (const addr of iface) {
+            if (addr.family === 'IPv4' && addr.address !== '127.0.0.1') {
+              ipAddress = addr.address;
+              break;
+            }
+          }
+        }
+        if (ipAddress) break;
+      }
+    }
+
+    // Final fallback to localhost
+    if (!ipAddress) {
+      ipAddress = '127.0.0.1';
+      this.logger.warn('No network interface found, using 127.0.0.1');
+    }
+
+    this.logger.info(`Registering host: ${hostname} (${ipAddress})`);
 
     this.resourceId = await this.apiClient.registerHost({
       hostname,

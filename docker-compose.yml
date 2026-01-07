@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  host-agent:
+    image: devskin/host-agent:latest
+    container_name: devskin-host-agent
+    restart: unless-stopped
+
+    # Network configuration
+    network_mode: host  # Use host network for accurate network metrics
+
+    # Process and PID namespace
+    pid: host  # See host processes
+
+    # Privileged mode for full host access
+    privileged: true
+
+    # Mount host filesystems (read-only)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - /etc/hostname:/etc/hostname:ro
+      - /etc/localtime:/etc/localtime:ro
+
+    # Environment variables
+    environment:
+      # Required: API configuration
+      - DEVSKIN_API_URL=https://api-monitoring.devskin.com
+      - DEVSKIN_API_KEY=your-agent-key-here
+      - DEVSKIN_TENANT_ID=your-tenant-id-here
+
+      # Optional: Agent configuration
+      - DEVSKIN_HOSTNAME=${HOSTNAME}
+      - DEVSKIN_ENVIRONMENT=production
+      - DEVSKIN_COLLECTION_INTERVAL=60000
+      - DEVSKIN_DEBUG=false
+      - DEVSKIN_DOCKER_MODE=true
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "ps", "aux", "|", "grep", "node"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M

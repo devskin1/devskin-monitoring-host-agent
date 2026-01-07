@@ -3,6 +3,23 @@
 import { HostAgent } from './agent';
 import { ConfigLoader } from './config';
 import * as path from 'path';
+import * as fs from 'fs';
+
+// Check Docker environment and warn if volumes not mounted
+function checkDockerEnvironment() {
+  const isDocker = fs.existsSync('/.dockerenv') ||
+                   process.env.DEVSKIN_DOCKER_MODE === 'true';
+
+  if (isDocker) {
+    console.log('🐳 Docker environment detected');
+
+    // With --pid=host and volume mounts, systeminformation will read host metrics
+    if (!fs.existsSync('/proc/1/cgroup')) {
+      console.warn('⚠️  Running in Docker without --pid=host!');
+      console.warn('   Metrics may not be accurate. Use: docker run --pid=host ...');
+    }
+  }
+}
 
 function printUsage() {
   console.log(`
@@ -41,6 +58,9 @@ async function main() {
   }
 
   try {
+    // Check Docker environment
+    checkDockerEnvironment();
+
     // Load configuration
     console.log('Loading configuration...');
     const config = ConfigLoader.load(configPath);

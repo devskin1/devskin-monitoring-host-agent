@@ -53,10 +53,10 @@ cp config.example.json /etc/devskin/config.json
 nano /etc/devskin/config.json
 ```
 
-Required configuration:
-- `apiUrl`: DevSkin backend URL (e.g., `https://api-monitoring.devskin.com`)
-- `agentKey`: Authentication key (generate in DevSkin UI)
-- `tenantId`: Your tenant ID from DevSkin
+**Required configuration:**
+- `apiUrl`: DevSkin backend URL (e.g., `https://api-monitoring.devskin.com/api/infrastructure`)
+- `agentKey`: Authentication key (get from DevSkin UI → Settings → Agents)
+- `tenantId`: Your tenant ID from DevSkin (Settings → Account)
 
 ## Configuration
 
@@ -64,32 +64,77 @@ Example `config.json`:
 
 ```json
 {
-  "apiUrl": "https://api-monitoring.devskin.com",
-  "agentKey": "your-agent-key-here",
-  "tenantId": "your-tenant-id-here",
+  "apiUrl": "https://api-monitoring.devskin.com/api/infrastructure",
+  "agentKey": "dsk_agent_xxxxxxxxxxxxxxxx",
+  "tenantId": "your-tenant-id-uuid",
   "hostname": "auto-detect",
+  "environment": "production",
   "collectionInterval": 60000,
-  "batchSize": 10,
-  "logLevel": "info",
-  "collectors": {
-    "cpu": { "enabled": true },
-    "memory": { "enabled": true },
-    "disk": {
-      "enabled": true,
-      "mountPoints": ["/", "/home"]
-    },
-    "network": {
-      "enabled": true,
-      "interfaces": ["eth0"]
-    },
-    "process": { "enabled": true }
-  }
+  "retryAttempts": 3,
+  "retryDelay": 5000,
+  "debug": false
 }
 ```
 
+**Configuration Options:**
+- `apiUrl` (required): Backend API endpoint
+- `agentKey` (required): Agent authentication key
+- `tenantId` (required): Your tenant UUID
+- `hostname` (optional): Host identifier (defaults to system hostname)
+- `environment` (optional): Environment name (production, staging, etc.)
+- `collectionInterval` (optional): Collection frequency in ms (default: 60000)
+- `retryAttempts` (optional): Number of retry attempts on failure (default: 3)
+- `retryDelay` (optional): Delay between retries in ms (default: 5000)
+- `debug` (optional): Enable debug logging (default: false)
+
 ## Running the Agent
 
-### Manual Mode
+### Option 1: Docker (Recommended) 🐳
+
+Docker is the easiest way to deploy the agent. The image is pre-configured to collect host metrics correctly.
+
+**Quick Start:**
+
+```bash
+# Pull the image
+docker pull devskin/host-agent:latest
+
+# Run with docker-compose
+curl -O https://raw.githubusercontent.com/devskin/monitoring-agents/main/host-agent/docker-compose.yml
+# Edit docker-compose.yml with your API credentials
+docker-compose up -d
+
+# Or run directly with docker
+docker run -d \
+  --name devskin-host-agent \
+  --restart unless-stopped \
+  --network host \
+  --pid host \
+  --privileged \
+  -v /proc:/host/proc:ro \
+  -v /sys:/host/sys:ro \
+  -v /:/rootfs:ro \
+  -v /etc/hostname:/etc/hostname:ro \
+  -e DEVSKIN_API_URL=https://api-monitoring.devskin.com \
+  -e DEVSKIN_API_KEY=your-agent-key \
+  -e DEVSKIN_TENANT_ID=your-tenant-id \
+  devskin/host-agent:latest
+```
+
+**Important Docker Notes:**
+- `--network host`: Required for accurate network metrics
+- `--pid host`: Required to see host processes
+- `--privileged`: Required for full system access
+- `-v /proc:/host/proc:ro`: Mounts host /proc for CPU, memory, process metrics
+- `-v /sys:/host/sys:ro`: Mounts host /sys for disk and network metrics
+- `-v /:/rootfs:ro`: Mounts host root for filesystem metrics
+
+**Check logs:**
+```bash
+docker logs -f devskin-host-agent
+```
+
+### Option 2: Manual Mode
 
 ```bash
 # Run directly
@@ -99,7 +144,7 @@ npm start -- --config /etc/devskin/config.json
 npm run dev -- --config /etc/devskin/config.json
 ```
 
-### As a Systemd Service (Recommended)
+### Option 3: As a Systemd Service
 
 1. Create user for the agent:
 
