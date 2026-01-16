@@ -37,6 +37,19 @@ export interface HostRegistrationData {
   metadata?: object;
 }
 
+export interface ContainerData {
+  id: string;
+  name: string;
+  image: string;
+  status: 'online' | 'offline' | 'degraded';
+  state: string;
+  ports: string[];
+  restartCount: number;
+  composeProject?: string;
+  composeService?: string;
+  labels: Record<string, string>;
+}
+
 export class ApiClient {
   private client: AxiosInstance;
   private config: AgentConfig;
@@ -106,6 +119,35 @@ export class ApiClient {
       );
     } catch (error) {
       throw this.handleError(error, 'Failed to send heartbeat');
+    }
+  }
+
+  /**
+   * Send container data to backend
+   */
+  async sendContainers(hostId: string, hostname: string, containers: ContainerData[]): Promise<void> {
+    try {
+      await this.retryRequest(() =>
+        this.client.post('/api/infrastructure/containers', {
+          host_id: hostId,
+          hostname: hostname,
+          tenant_id: this.config.tenantId,
+          containers: containers.map(c => ({
+            container_id: c.id,
+            name: c.name,
+            image: c.image,
+            status: c.status,
+            state: c.state,
+            ports: c.ports,
+            restart_count: c.restartCount,
+            compose_project: c.composeProject,
+            compose_service: c.composeService,
+            labels: c.labels,
+          })),
+        })
+      );
+    } catch (error) {
+      throw this.handleError(error, 'Failed to send containers');
     }
   }
 

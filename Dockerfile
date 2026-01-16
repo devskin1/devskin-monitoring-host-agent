@@ -21,11 +21,12 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install system dependencies for host monitoring
+# Install system dependencies for host monitoring and Docker CLI
 RUN apk add --no-cache \
     procps \
     sysstat \
-    util-linux
+    util-linux \
+    docker-cli
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
@@ -35,9 +36,8 @@ RUN npm ci --only=production && \
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /app/
-RUN chmod +x /app/docker-entrypoint.sh
+# Copy entrypoint script with execute permission
+COPY --chmod=755 docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Create config directory
 RUN mkdir -p /app/config && chown node:node /app/config
@@ -46,7 +46,7 @@ RUN mkdir -p /app/config && chown node:node /app/config
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD ps aux | grep -v grep | grep "node dist/index.js" || exit 1
 
-# Run as non-root user (but needs some host access)
-USER node
+# Note: Running as root to access Docker socket and host metrics
+# In production, consider using a dedicated user with docker group permissions
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

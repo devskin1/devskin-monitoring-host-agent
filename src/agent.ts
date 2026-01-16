@@ -8,22 +8,27 @@ import { MemoryCollector } from './collectors/memory.collector';
 import { DiskCollector } from './collectors/disk.collector';
 import { NetworkCollector } from './collectors/network.collector';
 import { LoadCollector } from './collectors/load.collector';
+import { DockerCollector } from './collectors/docker.collector';
 
 export class HostAgent {
   private config: AgentConfig;
   private apiClient: ApiClient;
   private logger: winston.Logger;
   private resourceId?: string;
+  private hostname?: string;
   private collectionTimer?: NodeJS.Timeout;
   private heartbeatTimer?: NodeJS.Timeout;
+  private containerTimer?: NodeJS.Timeout;
   private metricBuffer: MetricData[] = [];
   private isRunning = false;
   private collectors: BaseCollector[] = [];
+  private dockerCollector: DockerCollector;
 
   constructor(config: AgentConfig) {
     this.config = config;
     this.apiClient = new ApiClient(config);
     this.logger = this.createLogger();
+    this.dockerCollector = new DockerCollector();
     this.initializeCollectors();
   }
 
@@ -79,6 +84,7 @@ export class HostAgent {
       this.isRunning = true;
       this.startCollectionLoop();
       this.startHeartbeatLoop();
+      this.startContainerCollectionLoop();
 
       this.logger.info('Agent started successfully');
     } catch (error: any) {
@@ -102,6 +108,10 @@ export class HostAgent {
       clearInterval(this.heartbeatTimer);
     }
 
+    if (this.containerTimer) {
+      clearInterval(this.containerTimer);
+    }
+
     // Flush remaining metrics
     if (this.metricBuffer.length > 0 && this.resourceId) {
       await this.flushMetrics();
@@ -114,15 +124,19 @@ export class HostAgent {
    * Register host with backend
    */
   private async registerHost(): Promise<void> {
+    // Use hostname from config if set, otherwise fall back to os.hostname()
+    // In Docker, the config hostname should come from /etc/hostname (the real host)
+    this.hostname = this.config.hostname && this.config.hostname !== 'auto-detect'
+      ? this.config.hostname
+      : os.hostname();
+
     if (this.config.resourceId && this.config.resourceId !== 'auto-generate-on-first-run') {
       this.resourceId = this.config.resourceId;
       this.logger.info(`Using existing resource ID: ${this.resourceId}`);
       return;
     }
 
-    const hostname = this.config.hostname === 'auto-detect'
-      ? os.hostname()
-      : this.config.hostname || os.hostname();
+    const hostname = this.hostname;
 
     const networkInterfaces = os.networkInterfaces();
     let ipAddress: string | undefined;
@@ -210,6 +224,47 @@ export class HostAgent {
         }
       }
     }, 30000);
+  }
+
+  /**
+   * Start container collection loop
+   */
+  private startContainerCollectionLoop(): void {
+    // Collect containers immediately
+    this.collectContainers();
+
+    // Then collect every 60 seconds
+    this.containerTimer = setInterval(() => {
+      this.collectContainers();
+    }, 60000);
+  }
+
+  /**
+   * Collect Docker containers and send to API
+   */
+  private async collectContainers(): Promise<void> {
+    if (!this.resourceId || !this.hostname) {
+      return;
+    }
+
+    try {
+      const isDockerAvailable = await this.dockerCollector.isAvailable();
+      if (!isDockerAvailable) {
+        this.logger.debug('Docker not available on this host');
+        return;
+      }
+
+      const containers = await this.dockerCollector.collectContainers();
+      if (containers.length === 0) {
+        this.logger.debug('No Docker containers found');
+        return;
+      }
+
+      await this.apiClient.sendContainers(this.resourceId, this.hostname, containers);
+      this.logger.info(`Sent ${containers.length} container(s) to API`);
+    } catch (error: any) {
+      this.logger.error(`Failed to collect/send containers: ${error.message}`);
+    }
   }
 
   /**

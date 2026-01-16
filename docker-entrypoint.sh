@@ -1,13 +1,25 @@
 #!/bin/sh
 set -e
 
+# Detect hostname - prefer /etc/hostname file (mounted from host) over hostname command
+# The hostname command in Docker returns container ID, but /etc/hostname has the real host name
+if [ -n "${DEVSKIN_HOSTNAME}" ]; then
+  DETECTED_HOSTNAME="${DEVSKIN_HOSTNAME}"
+elif [ -f "/etc/hostname" ]; then
+  DETECTED_HOSTNAME=$(cat /etc/hostname | tr -d '\n')
+  echo "Using hostname from /etc/hostname: ${DETECTED_HOSTNAME}"
+else
+  DETECTED_HOSTNAME=$(hostname)
+  echo "Warning: Using container hostname (may not be accurate): ${DETECTED_HOSTNAME}"
+fi
+
 # Generate config.json from environment variables
 cat > /app/config/config.json <<EOF
 {
   "apiUrl": "${DEVSKIN_API_URL:-https://api-monitoring.devskin.com}",
   "agentKey": "${DEVSKIN_API_KEY}",
   "tenantId": "${DEVSKIN_TENANT_ID}",
-  "hostname": "${DEVSKIN_HOSTNAME:-$(hostname)}",
+  "hostname": "${DETECTED_HOSTNAME}",
   "environment": "${DEVSKIN_ENVIRONMENT:-production}",
   "collectionInterval": ${DEVSKIN_COLLECTION_INTERVAL:-60000},
   "batchSize": ${DEVSKIN_BATCH_SIZE:-10},
