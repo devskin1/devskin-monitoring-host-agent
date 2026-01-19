@@ -9,6 +9,7 @@ import { DiskCollector } from './collectors/disk.collector';
 import { NetworkCollector } from './collectors/network.collector';
 import { LoadCollector } from './collectors/load.collector';
 import { DockerCollector } from './collectors/docker.collector';
+import { ProcessCollector } from './collectors/process.collector';
 
 export class HostAgent {
   private config: AgentConfig;
@@ -19,16 +20,19 @@ export class HostAgent {
   private collectionTimer?: NodeJS.Timeout;
   private heartbeatTimer?: NodeJS.Timeout;
   private containerTimer?: NodeJS.Timeout;
+  private processTimer?: NodeJS.Timeout;
   private metricBuffer: MetricData[] = [];
   private isRunning = false;
   private collectors: BaseCollector[] = [];
   private dockerCollector: DockerCollector;
+  private processCollector: ProcessCollector;
 
   constructor(config: AgentConfig) {
     this.config = config;
     this.apiClient = new ApiClient(config);
     this.logger = this.createLogger();
     this.dockerCollector = new DockerCollector();
+    this.processCollector = new ProcessCollector({ topN: 100, collectAll: false });
     this.initializeCollectors();
   }
 
@@ -42,6 +46,7 @@ export class HostAgent {
       new DiskCollector(),
       new NetworkCollector(),
       new LoadCollector(),
+      this.processCollector,
     ];
 
     this.logger.info(`Initialized ${this.collectors.length} collectors: ${this.collectors.map(c => c.getName()).join(', ')}`);
@@ -85,6 +90,7 @@ export class HostAgent {
       this.startCollectionLoop();
       this.startHeartbeatLoop();
       this.startContainerCollectionLoop();
+      this.startProcessCollectionLoop();
 
       this.logger.info('Agent started successfully');
     } catch (error: any) {
@@ -110,6 +116,10 @@ export class HostAgent {
 
     if (this.containerTimer) {
       clearInterval(this.containerTimer);
+    }
+
+    if (this.processTimer) {
+      clearInterval(this.processTimer);
     }
 
     // Flush remaining metrics
@@ -237,6 +247,41 @@ export class HostAgent {
     this.containerTimer = setInterval(() => {
       this.collectContainers();
     }, 60000);
+  }
+
+  /**
+   * Start process collection loop
+   */
+  private startProcessCollectionLoop(): void {
+    // Collect processes immediately
+    this.collectProcesses();
+
+    // Then collect every 30 seconds
+    this.processTimer = setInterval(() => {
+      this.collectProcesses();
+    }, 30000);
+  }
+
+  /**
+   * Collect processes and send to API
+   */
+  private async collectProcesses(): Promise<void> {
+    if (!this.resourceId) {
+      return;
+    }
+
+    try {
+      const processes = await this.processCollector.collectProcesses();
+      if (processes.length === 0) {
+        this.logger.debug('No processes found');
+        return;
+      }
+
+      await this.apiClient.sendProcesses(this.resourceId, processes);
+      this.logger.debug(`Sent ${processes.length} processes to API`);
+    } catch (error: any) {
+      this.logger.error(`Failed to collect/send processes: ${error.message}`);
+    }
   }
 
   /**

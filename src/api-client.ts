@@ -50,6 +50,23 @@ export interface ContainerData {
   labels: Record<string, string>;
 }
 
+export interface ProcessData {
+  pid: number;
+  ppid: number;
+  name: string;
+  command: string;
+  path: string;
+  user: string;
+  state: 'running' | 'sleeping' | 'stopped' | 'zombie' | 'idle' | 'disk-sleep' | 'unknown';
+  cpuPercent: number;
+  memPercent: number;
+  memRss: number;
+  memVms: number;
+  nice: number;
+  started: Date | null;
+  numThreads: number;
+}
+
 export class ApiClient {
   private client: AxiosInstance;
   private config: AgentConfig;
@@ -148,6 +165,39 @@ export class ApiClient {
       );
     } catch (error) {
       throw this.handleError(error, 'Failed to send containers');
+    }
+  }
+
+  /**
+   * Send process data to backend
+   */
+  async sendProcesses(hostId: string, processes: ProcessData[]): Promise<void> {
+    try {
+      await this.retryRequest(() =>
+        this.client.post('/api/infrastructure/processes', {
+          host_id: hostId,
+          tenant_id: this.config.tenantId,
+          collected_at: new Date().toISOString(),
+          processes: processes.map(p => ({
+            pid: p.pid,
+            ppid: p.ppid,
+            name: p.name,
+            command: p.command,
+            exe_path: p.path,
+            username: p.user,
+            status: p.state,
+            cpu_percent: p.cpuPercent,
+            memory_percent: p.memPercent,
+            memory_rss: p.memRss,
+            memory_vms: p.memVms,
+            nice: p.nice,
+            started_at: p.started ? p.started.toISOString() : null,
+            num_threads: p.numThreads,
+          })),
+        })
+      );
+    } catch (error) {
+      throw this.handleError(error, 'Failed to send processes');
     }
   }
 
